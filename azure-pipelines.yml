@@ -42,15 +42,13 @@ stages:
                 latest
 
   - stage: Deploy
-    displayName: Deploy to environment
+    displayName: Deploy to AKS
     dependsOn: BuildAndTest
-    condition: and(succeeded(), or(eq(variables['Build.SourceBranchName'], 'master'), eq(variables['Build.SourceBranchName'], 'develop'), eq(variables['Build.SourceBranchName'], 'staging')))
     jobs:
-      - deployment: DeployToEnv
-        environment:
-          ${{ if eq(variables['Build.SourceBranchName'], 'master') }}: production
-          ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}: develop
-          ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}: staging
+      - deployment: DeployToProduction
+        displayName: Deploy to production
+        condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
+        environment: production
         strategy:
           runOnce:
             deploy:
@@ -61,8 +59,39 @@ stages:
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
-                      echo "🔐 Autenticando con AKS..."
                       az aks get-credentials --resource-group $(resourceGroup) --name $(clusterName)
+                      kubectl set image deployment/microservice microservice=$(acrName).azurecr.io/$(imageName):$(Build.SourceBranchName)-$(Build.BuildId)
 
-                      echo "🚀 Haciendo rollout del deployment..."
+      - deployment: DeployToDevelop
+        displayName: Deploy to develop
+        condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'develop'))
+        environment: develop
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: 'AZURE_CONNECTION'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az aks get-credentials --resource-group $(resourceGroup) --name $(clusterName)
+                      kubectl set image deployment/microservice microservice=$(acrName).azurecr.io/$(imageName):$(Build.SourceBranchName)-$(Build.BuildId)
+
+      - deployment: DeployToStaging
+        displayName: Deploy to staging
+        condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'staging'))
+        environment: staging
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: 'AZURE_CONNECTION'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az aks get-credentials --resource-group $(resourceGroup) --name $(clusterName)
                       kubectl set image deployment/microservice microservice=$(acrName).azurecr.io/$(imageName):$(Build.SourceBranchName)-$(Build.BuildId)
