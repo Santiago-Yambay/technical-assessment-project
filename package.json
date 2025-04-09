@@ -1,0 +1,23 @@
+{
+  "name": "technical-assessment-project",
+  "version": "1.0.0",
+  "description": "Technical assesment project by Santiago Yambay",
+  "main": "index.js",
+  "scripts": {
+    "test": "tes-init"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Santiago-Yambay/technical-assessment-project.git"
+  },
+  "author": "Santiago Yambay",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Santiago-Yambay/technical-assessment-project/issues"
+  },
+  "homepage": "https://github.com/Santiago-Yambay/technical-assessment-project#readme",
+  "dependencies": {
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
