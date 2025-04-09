@@ -47,7 +47,10 @@ stages:
     condition: and(succeeded(), or(eq(variables['Build.SourceBranchName'], 'master'), eq(variables['Build.SourceBranchName'], 'develop'), eq(variables['Build.SourceBranchName'], 'staging')))
     jobs:
       - deployment: DeployToEnv
-        environment: ${{ variables['Build.SourceBranchName'] == 'master' && 'production' || variables['Build.SourceBranchName'] }}
+        environment:
+          ${{ if eq(variables['Build.SourceBranchName'], 'master') }}: production
+          ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}: develop
+          ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}: staging
         strategy:
           runOnce:
             deploy:
@@ -60,6 +63,6 @@ stages:
                     inlineScript: |
                       echo "🔐 Autenticando con AKS..."
                       az aks get-credentials --resource-group $(resourceGroup) --name $(clusterName)
-                      
+
                       echo "🚀 Haciendo rollout del deployment..."
                       kubectl set image deployment/microservice microservice=$(acrName).azurecr.io/$(imageName):$(Build.SourceBranchName)-$(Build.BuildId)
