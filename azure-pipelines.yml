@@ -1,76 +1,65 @@
 trigger:
   branches:
     include:
-      - '*'  
-
-pr:
-  branches:
-    include:
-      - '*'  
+      - master
+      - develop
+      - staging
 
 variables:
   imageName: 'microservice'
+  acrName: 'acrmicroservicesanti'
+  resourceGroup: 'microservice-rg'
+  clusterName: 'microservice-cluster'
 
 stages:
-  - stage: Build
-    displayName: Build Docker image
+  - stage: BuildAndTest
+    displayName: Build & Test
     jobs:
-      - job: Build
+      - job: Node
         pool:
           vmImage: 'ubuntu-latest'
         steps:
           - task: NodeTool@0
             inputs:
               versionSpec: '18.x'
-            displayName: 'Install Node.js'
-
-          - script: npm ci
-            displayName: 'Install dependencies (clean install)'
-
-          - script: npm run build || echo "skip build"
-            displayName: 'Optional build step'
-
-          - task: Docker@2
-            displayName: 'Build Docker image'
-            inputs:
-              command: build
-              Dockerfile: Dockerfile
-              tags: latest
-              repository: $(imageName)
-
-  - stage: Test
-    displayName: Run Tests
-    jobs:
-      - job: Test
-        pool:
-          vmImage: 'ubuntu-latest'
-        steps:
-          - task: NodeTool@0
-            inputs:
-              versionSpec: '18.x'
+            displayName: 'Use Node.js'
 
           - script: npm ci
             displayName: 'Install dependencies'
 
           - script: npm test
-            displayName: 'Run unit tests'
+            displayName: 'Run tests'
+
+          - task: Docker@2
+            displayName: 'Build and Push Docker Image'
+            inputs:
+              containerRegistry: 'ACR_CONNECTION'
+              repository: $(imageName)
+              command: buildAndPush
+              Dockerfile: Dockerfile
+              tags: |
+                $(Build.SourceBranchName)-$(Build.BuildId)
+                latest
 
   - stage: Deploy
     displayName: Deploy to environment
-    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranchName'], 'master'), eq(variables['Build.SourceBranchName'], 'develop'), eq(variables['Build.SourceBranchName'], 'staging')))
     jobs:
-      - deployment: DeployProd
-        displayName: 'Deploy to production (master only)'
-        environment: 'production'
+      - deployment: DeployToEnv
+        environment: ${{ variables['Build.SourceBranchName'] == 'master' && 'production' || variables['Build.SourceBranchName'] }}
         strategy:
           runOnce:
             deploy:
               steps:
                 - task: AzureCLI@2
                   inputs:
-                    azureSubscription: '<Tu-Conexión-Azure>'
+                    azureSubscription: 'AZURE_CONNECTION'
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
-                      az aks get-credentials --resource-group microservice-rg --name microservice-cluster
-                      kubectl set image deployment/microservice microservice=acrmicroservicesanti.azurecr.io/microservice:latest
+                      echo "🔐 Autenticando con AKS..."
+                      az aks get-credentials --resource-group $(resourceGroup) --name $(clusterName)
+                      
+                      echo "🚀 Haciendo rollout del deployment..."
+                      kubectl set image deployment/microservice microservice=$(acrName).azurecr.io/$(imageName):$(Build.SourceBranchName)-$(Build.BuildId)
