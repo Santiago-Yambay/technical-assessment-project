@@ -4,7 +4,8 @@
   "description": "Technical assesment project by Santiago Yambay",
   "main": "index.js",
   "scripts": {
-    "test": "tes-init"
+    "test": "tes-init",
+    "start": "node src/index.js"
   },
   "repository": {
     "type": "git",

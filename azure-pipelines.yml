@@ -1,0 +1,76 @@
+trigger:
+  branches:
+    include:
+      - '*'  
+
+pr:
+  branches:
+    include:
+      - '*'  
+
+variables:
+  imageName: 'microservice'
+
+stages:
+  - stage: Build
+    displayName: Build Docker image
+    jobs:
+      - job: Build
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+            displayName: 'Install Node.js'
+
+          - script: npm ci
+            displayName: 'Install dependencies (clean install)'
+
+          - script: npm run build || echo "skip build"
+            displayName: 'Optional build step'
+
+          - task: Docker@2
+            displayName: 'Build Docker image'
+            inputs:
+              command: build
+              Dockerfile: Dockerfile
+              tags: latest
+              repository: $(imageName)
+
+  - stage: Test
+    displayName: Run Tests
+    jobs:
+      - job: Test
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+
+          - script: npm ci
+            displayName: 'Install dependencies'
+
+          - script: npm test
+            displayName: 'Run unit tests'
+
+  - stage: Deploy
+    displayName: Deploy to environment
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
+    jobs:
+      - deployment: DeployProd
+        displayName: 'Deploy to production (master only)'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: '<Tu-Conexión-Azure>'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az aks get-credentials --resource-group microservice-rg --name microservice-cluster
+                      kubectl set image deployment/microservice microservice=acrmicroservicesanti.azurecr.io/microservice:latest

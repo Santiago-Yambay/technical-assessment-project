@@ -13,8 +13,16 @@ log/
 # Environment variables
 .env
 .env.*
-
 .DS_Store
 Thumbs.db
 .vscode/
 coverage/
+
+# IaC
+terraform.tfvars
+.terraform/
+*.exe
+*.log
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
